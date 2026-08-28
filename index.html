@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>فال و راز | خروجی نهایی وب</title>
+    <!-- فونت فارسی وزیرمتن -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.0.3/misc/Farsi-Digits/font-face.css" rel="stylesheet" />
+    <!-- Tailwind CSS (از طریق CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js برای آسمان ستاره‌ای -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; direction: rtl; }
+        * { box-sizing: border-box; }
+        /* اسکرول بار مخفی اما قابل اسکرول */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 10px; }
+        /* افکت چشمک‌زدن ستاره‌ها (اختیاری) */
+        .star-twinkle { animation: twinkle 3s infinite alternate; }
+        @keyframes twinkle { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body class="min-h-screen text-white relative overflow-hidden transition-colors duration-500">
+
+    <!-- ====== 1. پس‌زمینه سه‌بعدی ستاره‌ها (Three.js) ====== -->
+    <div id="star-container" class="fixed top-0 left-0 w-full h-full -z-10 pointer-events-none"></div>
+
+    <!-- ====== 2. صفحه لودینگ (Splash Screen) ====== -->
+    <div id="splash-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-700">
+        <div class="w-20 h-20 rounded-full border-4 border-purple-500 border-t-transparent animate-spin mb-4"></div>
+        <h1 class="text-3xl font-bold text-white">🔮 فال و راز</h1>
+        <p class="text-gray-400 mt-2 text-sm">در حال طلوع ستارگان...</p>
+    </div>
+
+    <!-- ====== 3. محتوای اصلی (صفحه وب) ====== -->
+    <div id="main-content" class="flex flex-col lg:flex-row h-screen overflow-hidden opacity-0 transition-opacity duration-700">
+        
+        <!-- نوار کناری (Sidebar) - فقط در دسکتاپ -->
+        <aside class="lg:w-80 w-full lg:h-full bg-black/30 backdrop-blur-md border-l lg:border-r border-white/10 p-4 overflow-y-auto flex-shrink-0 hidden lg:block">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-2">
+                    <span class="text-3xl">🔮</span>
+                    <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-purple-500">فال و راز</h1>
+                </div>
+                <div id="points-display-sidebar" class="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-sm">
+                    <span class="text-yellow-300">⭐</span>
+                    <span id="points-number">0</span>
+                </div>
+            </div>
+
+            <!-- لیست برج‌ها -->
+            <div class="flex flex-col gap-2 mb-6">
+                <h2 class="text-sm text-gray-400 mb-1">برج خود را انتخاب کنید</h2>
+                <div id="zodiac-list" class="flex flex-col gap-1"></div>
+            </div>
+
+            <!-- انتخاب تاریخ -->
+            <div class="bg-white/10 p-3 rounded-xl border border-white/10 mb-6">
+                <h2 class="text-sm text-gray-400 mb-2">تاریخ دلخواه</h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="changeDate(-1)" class="bg-purple-700/50 p-1 rounded-md text-sm">◀</button>
+                    <input id="date-input" type="text" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center w-full text-sm focus:border-purple-400 outline-none" />
+                    <button onclick="changeDate(1)" class="bg-purple-700/50 p-1 rounded-md text-sm">▶</button>
+                </div>
+                <div class="text-center text-xs text-gray-400 mt-2">
+                    <span id="display-date"></span> - <span id="display-weekday"></span>
+                </div>
+                <button onclick="resetToToday()" class="w-full mt-2 text-xs bg-blue-800/60 px-3 py-1 rounded-full hover:bg-blue-700">بازگشت به امروز</button>
+            </div>
+
+            <!-- تطابق عشقی -->
+            <div class="bg-white/5 p-3 rounded-xl border border-pink-500/20">
+                <button onclick="toggleLoveMatch()" class="w-full py-2 bg-gradient-to-r from-pink-600 to-rose-600 rounded-lg font-bold text-sm hover:scale-105 transition transform">
+                    💞 تطابق عشقی
+                </button>
+                <div id="love-section" class="hidden flex-col gap-2 mt-3">
+                    <div class="flex gap-2">
+                        <select id="love-z1" class="flex-1 bg-slate-800 border border-slate-600 rounded p-1 text-xs outline-none"></select>
+                        <span class="text-pink-400 font-bold text-lg">❤️</span>
+                        <select id="love-z2" class="flex-1 bg-slate-800 border border-slate-600 rounded p-1 text-xs outline-none"></select>
+                    </div>
+                    <button onclick="handleLoveMatch()" class="py-1 bg-pink-700 rounded-lg text-xs hover:bg-pink-600">دریافت تحلیل</button>
+                    <div id="love-result" class="mt-2 p-2 bg-slate-800/80 rounded-lg border border-pink-400/30 text-xs leading-relaxed text-gray-200 whitespace-pre-line hidden max-h-40 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- دکمه پروفایل -->
+            <button onclick="toggleProfile()" class="w-full mt-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-sm hover:scale-105 transition transform">
+                👤 پروفایل کاربری
+            </button>
+        </aside>
+
+        <!-- محتوای اصلی (وسط) -->
+        <main class="flex-1 overflow-y-auto p-4 lg:p-8 flex flex-col items-center justify-start relative">
+            
+            <!-- هدر موبایل (فقط در گوشی) -->
+            <div class="lg:hidden flex justify-between items-center w-full max-w-md mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-3xl">🔮</span>
+                    <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-purple-500">فال و راز</h1>
+                </div>
+                <div class="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-sm">
+                    <span class="text-yellow-300">⭐</span>
+                    <span id="points-number-mobile">0</span>
+                </div>
+                <button onclick="toggleProfile()" class="bg-white/10 p-2 rounded-full hover:bg-white/20 text-xl">👤</button>
+            </div>
+
+            <!-- کارت فال روزانه -->
+            <div id="horoscope-card" class="w-full max-w-2xl bg-white/10 backdrop-blur-md rounded-3xl p-6 lg:p-8 border border-white/20 shadow-2xl mb-8 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="horoscope-title" class="text-2xl lg:text-3xl font-bold text-yellow-300">فال امروز</h2>
+                    <div class="text-left text-xs bg-purple-800/60 px-3 py-1 rounded-full">
+                        <span id="date-on-card"></span> | <span id="weekday-on-card"></span>
+                    </div>
+                </div>
+                <p id="horoscope-text" class="text-base lg:text-lg leading-relaxed mb-6 text-gray-100"></p>
+                
+                <div class="grid grid-cols-2 gap-3 text-sm bg-black/30 p-4 rounded-xl">
+                    <div>🔢 عدد شانس: <span id="lucky-num" class="text-yellow-300 font-bold"></span></div>
+                    <div>🎨 رنگ شانس: <span id="lucky-color" class="font-bold"></span></div>
+                    <div>🧭 جهت شانس: <span id="lucky-dir" class="text-cyan-300"></span></div>
+                    <div>⏰ زمان مناسب: <span id="best-time" class="text-green-300"></span></div>
+                    <div class="col-span-2">💎 سنگ پیشنهادی: <span id="lucky-stone" class="text-pink-300 font-bold"></span></div>
+                </div>
+
+                <button onclick="playAudio()" class="mt-4 w-full py-3 bg-purple-700 hover:bg-purple-600 rounded-xl flex justify-center items-center gap-2 transition text-white font-bold shadow-lg">
+                    🎧 گوش دادن به فال صوتی
+                </button>
+            </div>
+
+            <!-- بخش کف‌شناسی هوشمند -->
+            <div class="w-full max-w-2xl mt-4 p-6 bg-gradient-to-r from-amber-900/40 to-red-900/40 rounded-xl border border-amber-600/30">
+                <p class="text-lg font-bold text-amber-300">✋ کف‌شناسی هوشمند (Palmistry)</p>
+                <p class="text-xs text-gray-300 mb-3">عکس کف دست خود را آپلود کنید تا خطوط اصلی تحلیل شوند.</p>
+                <input type="file" accept="image/*" onchange="handlePalmUpload(event)" class="mt-2 block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-amber-600 file:text-white hover:file:bg-amber-500 cursor-pointer" />
+                <div id="palm-result" class="mt-4 p-4 bg-black/40 rounded-xl text-gray-200 text-sm leading-relaxed hidden"></div>
+            </div>
+
+            <footer class="text-center text-gray-400 text-xs mt-auto p-4">
+                ✨ ساخته شده با هوش مصنوعی برای شما ✨
+            </footer>
+        </main>
+    </div>
+
+    <!-- ====== 4. مودال پروفایل (حرفه‌ای) ====== -->
+    <div id="profile-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 hidden">
+        <div class="w-full max-w-lg bg-gradient-to-br from-slate-900 to-purple-900 rounded-3xl p-6 border border-white/10 shadow-2xl relative">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-r from-yellow-400 to-purple-500 flex items-center justify-center text-2xl font-bold text-white">👤</div>
+                    <div><h2 class="text-2xl font-bold text-white">کاربر عزیز</h2><span id="profile-level" class="text-sm text-yellow-300">سطح: برنز ⭐</span></div>
+                </div>
+                <button onclick="toggleProfile()" class="text-gray-400 hover:text-white text-2xl">✕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-white/10 p-3 rounded-xl text-center"><div id="profile-points" class="text-yellow-300 text-xl font-bold">0</div><div class="text-xs text-gray-400">امتیاز کل</div></div>
+                <div class="bg-white/10 p-3 rounded-xl text-center"><div id="profile-reads" class="text-blue-300 text-xl font-bold">0</div><div class="text-xs text-gray-400">فال‌های خوانده‌شده</div></div>
+            </div>
+            
+            <div class="bg-white/5 p-4 rounded-xl border border-purple-500/30 mb-6">
+                <h3 class="text-lg font-bold text-white mb-2">🤝 دعوت از دوستان</h3>
+                <div class="flex gap-2">
+                    <input id="ref-link" type="text" value="https://faloraz.ir/ref/USER123" readonly class="flex-1 bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm text-gray-300 outline-none" />
+                    <button onclick="copyReferral()" class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg text-white text-sm font-bold transition">کپی لینک</button>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">با هر دعوت، شما ۵۰ امتیاز و دوست شما ۱۰ امتیاز می‌گیرد!</p>
+            </div>
+
+            <div class="bg-white/5 p-4 rounded-xl border border-yellow-500/30 mb-6">
+                <h3 class="text-lg font-bold text-white mb-2">📸 اشتراک‌گذاری فال امروز</h3>
+                <button onclick="downloadImage()" class="w-full py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-xl hover:scale-105 transition transform shadow-lg">
+                    دریافت تصویر فال و به اشتراک‌گذاری
+                </button>
+            </div>
+            <button class="w-full bg-slate-800/50 hover:bg-slate-700 p-3 rounded-xl text-right text-gray-300 text-sm">خروج از حساب کاربری</button>
+        </div>
+    </div>
+
+    <!-- ====== اسکریپت‌های جاوا اسکریپت ====== -->
+    <script>
+        // ---------------------------------------------
+        // 1. داده‌های اولیه (دیتابیس فال‌ها)
+        // ---------------------------------------------
+        const zodiacs = ['حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله', 'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'];
+        const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+        
+        // دیتابیس فال (ساده‌شده برای نمایش)
+        const horoscopeData = zodiacs.map((z, idx) => ({
+            name: z,
+            symbol: zodiacSymbols[idx],
+            daily: zodiacs.map((_, d) => ({
+                date: `۱۴۰۴-۰۱-${String(d+1).padStart(2,'0')}`,
+                text: `فال امروز برای برج ${z}: امروز روزی پر از انرژی مثبت است. ستاره‌ها به شما لبخند می‌زنند و فرصت‌های جدیدی در راه است.`,
+                lucky_number: Math.floor(Math.random()*9)+1,
+                lucky_color: ['قرمز', 'آبی', 'سبز', 'طلایی', 'سفید', 'بنفش'][Math.floor(Math.random()*6)],
+                lucky_direction: ['شرق', 'غرب', 'شمال', 'جنوب'][Math.floor(Math.random()*4)],
+                best_time: ['صبح', 'ظهر', 'عصر', 'شب'][Math.floor(Math.random()*4)],
+                gemstone: ['یاقوت', 'فیروزه', 'زمرد', 'عقیق', 'مروارید'][Math.floor(Math.random()*5)]
+            }))
+        }));
+
+        // ---------------------------------------------
+        // 2. متغیرهای وضعیت (State)
+        // ---------------------------------------------
+        let selectedZodiac = 'حمل';
+        let selectedDate = '';
+        let todayDateStr = '';
+        let userPoints = parseInt(localStorage.getItem('faloraz_points') || '0');
+        let userReads = parseInt(localStorage.getItem('faloraz_reads') || '0');
+        let todayReadFlag = localStorage.getItem('faloraz_today') === new Date().toDateString();
+
+        // ---------------------------------------------
+        // 3. توابع کمکی (Utilities)
+        // ---------------------------------------------
+        function toPersianNumber(num) {
+            const pDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+            return num.toString().replace(/\d/g, d => pDigits[d]);
+        }
+
+        function getPersianDate() {
+            // تاریخ شمسی ساده (فرمت تقریبی)
+            const now = new Date();
+            const year = 1404;
+            const month = now.getMonth() + 1; // تقریبی
+            const day = now.getDate();
+            return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        }
+
+        function getWeekday(dateStr) {
+            // محاسبه روز هفته بر اساس تاریخ شمسی (تقریبی)
+            const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه', 'شنبه'];
+            // شبیه‌سازی: فقط برای نمایش
+            return days[new Date().getDay()];
+        }
+
+        // ---------------------------------------------
+        // 4. هوش مصنوعی و ذخیره‌سازی (شبیه‌سازی)
+        // ---------------------------------------------
+        function addPoints(amount) {
+            userPoints += amount;
+            localStorage.setItem('faloraz_points', userPoints.toString());
+            updateUI();
+        }
+
+        function markReadToday() {
+            if (!todayReadFlag) {
+                addPoints(10);
+                userReads += 1;
+                localStorage.setItem('faloraz_reads', userReads.toString());
+                localStorage.setItem('faloraz_today', new Date().toDateString());
+                todayReadFlag = true;
+                updateUI();
+            }
+        }
+
+        // ---------------------------------------------
+        // 5. رندر اولیه و UI
+        // ---------------------------------------------
+        function initUI() {
+            // تنظیم تاریخ
+            todayDateStr = getPersianDate();
+            selectedDate = todayDateStr;
+            
+            // پر کردن لیست برج‌ها
+            const listContainer = document.getElementById('zodiac-list');
+            zodiacs.forEach(z => {
+                const btn = document.createElement('button');
+                btn.textContent = z;
+                btn.className = 'text-right px-4 py-2 rounded-lg transition-all hover:bg-white/10 text-sm';
+                btn.onclick = () => { selectedZodiac = z; renderHoroscope(); updateUI(); };
+                listContainer.appendChild(btn);
+            });
+
+            // پر کردن منوی کشویی عشق
+            const s1 = document.getElementById('love-z1');
+            const s2 = document.getElementById('love-z2');
+            zodiacs.forEach(z => {
+                const opt1 = document.createElement('option'); opt1.value = z; opt1.textContent = z;
+                const opt2 = document.createElement('option'); opt2.value = z; opt2.textContent = z;
+                s1.appendChild(opt1); s2.appendChild(opt2);
+            });
+
+            // رندر اولیه
+            renderHoroscope();
+            updateUI();
+
+            // مخفی کردن اسپلش و نمایش محتوا
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash-screen').style.display = 'none';
+                    document.getElementById('main-content').classList.remove('opacity-0');
+                }, 500);
+            }, 1500);
+        }
+
+        function updateUI() {
+            // به‌روزرسانی امتیازات
+            document.getElementById('points-number').textContent = toPersianNumber(userPoints);
+            document.getElementById('points-number-mobile').textContent = toPersianNumber(userPoints);
+            document.getElementById('profile-points').textContent = toPersianNumber(userPoints);
+            document.getElementById('profile-reads').textContent = toPersianNumber(userReads);
+            
+            // سطح‌بندی
+            let level = 'برنز';
+            if (userPoints > 300) level = 'طلا';
+            else if (userPoints > 100) level = 'نقره';
+            document.getElementById('profile-level').textContent = `سطح: ${level} ⭐`;
+        }
+
+        function renderHoroscope() {
+            const zodiacIdx = zodiacs.indexOf(selectedZodiac);
+            if (zodiacIdx === -1) return;
+
+            const data = horoscopeData[zodiacIdx];
+            const daily = data.daily.find(d => d.date === selectedDate) || data.daily[0];
+            
+            document.getElementById('horoscope-title').textContent = `فال امروز ${selectedZodiac} ${data.symbol}`;
+            document.getElementById('horoscope-text').textContent = daily.text;
+            document.getElementById('lucky-num').textContent = daily.lucky_number;
+            document.getElementById('lucky-color').textContent = daily.lucky_color;
+            document.getElementById('lucky-color').style.color = daily.lucky_color;
+            document.getElementById('lucky-dir').textContent = daily.lucky_direction;
+            document.getElementById('best-time').textContent = daily.best_time;
+            document.getElementById('lucky-stone').textContent = daily.gemstone;
+
+            document.getElementById('date-on-card').textContent = toPersianNumber(selectedDate);
+            document.getElementById('weekday-on-card').textContent = getWeekday(selectedDate);
+            
+            document.getElementById('display-date').textContent = toPersianNumber(selectedDate);
+            document.getElementById('display-weekday').textContent = getWeekday(selectedDate);
+            document.getElementById('date-input').value = selectedDate;
+
+            document.getElementById('horoscope-card').classList.remove('hidden');
+
+            // اگر تاریخ امروز باشد، امتیاز بده
+            if (selectedDate === todayDateStr) markReadToday();
+        }
+
+        function changeDate(offset) {
+            // تغییر تاریخ ساده (فرض بر ۳۰ روز ماه)
+            const parts = selectedDate.split('-');
+            let day = parseInt(parts[2]) + offset;
+            let month = parseInt(parts[1]);
+            let year = parseInt(parts[0]);
+            if (day > 30) { day = 1; month++; }
+            if (day < 1) { day = 30; month--; }
+            if (month > 12) { month = 1; year++; }
+            if (month < 1) { month = 12; year--; }
+            selectedDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            renderHoroscope();
+            updateUI();
+        }
+
+        function resetToToday() {
+            selectedDate = todayDateStr;
+            renderHoroscope();
+            updateUI();
+        }
+
+        // ---------------------------------------------
+        // 6. ویژگی‌های تعاملی
+        // ---------------------------------------------
+        function playAudio() {
+            const text = document.getElementById('horoscope-text').textContent;
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fa-IR';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // تطابق عشقی
+        function toggleLoveMatch() {
+            const sec = document.getElementById('love-section');
+            sec.classList.toggle('hidden');
+        }
+
+        function handleLoveMatch() {
+            const z1 = document.getElementById('love-z1').value;
+            const z2 = document.getElementById('love-z2').value;
+            const resultDiv = document.getElementById('love-result');
+            if (z1 === z2) {
+                resultDiv.textContent = 'برج‌ها نباید یکسان باشند! کمی تنوع به عشقتان بدهید 😉';
+                resultDiv.classList.remove('hidden');
+                return;
+            }
+            // شبیه‌سازی تحلیل هوش مصنوعی
+            const score = Math.floor(Math.random() * 40) + 60; // 60 تا 100
+            resultDiv.innerHTML = `
+                <p class="text-pink-300 font-bold">💞 درصد سازگاری شما: ${score}%</p>
+                <p>برج ${z1} و ${z2} ترکیب جذابی دارند. شما می‌توانید با درک تفاوت‌ها، یک رابطه پویا و پر از ماجراجویی بسازید.</p>
+                <p class="text-yellow-300 text-xs mt-1">⭐ پیشنهاد: امروز یک گفتگوی عمیق داشته باشید.</p>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+
+        // کف‌شناسی (شبیه‌سازی)
+        function handlePalmUpload(event) {
+            const file = event.target.files[0];
+            const resultDiv = document.getElementById('palm-result');
+            if (file) {
+                resultDiv.innerHTML = '🔍 در حال تحلیل خطوط کف دست با هوش مصنوعی...';
+                resultDiv.classList.remove('hidden');
+                setTimeout(() => {
+                    resultDiv.innerHTML = `
+                        <p class="text-amber-300 font-bold">✋ تحلیل خطوط دست شما:</p>
+                        <p>خط زندگی: بسیار عمیق و طولانی - نشان‌دهنده انرژی و سلامت بالا.</p>
+                        <p>خط قلب: منحنی و واضح - شما فردی احساساتی و وفادار هستید.</p>
+                        <p>خط سر: مستقیم و بدون انشعاب - قدرت تمرکز و تصمیم‌گیری بالایی دارید.</p>
+                        <p class="text-pink-300 text-xs mt-1">💎 سنگ پیشنهادی امروز: عقیق</p>
+                    `;
+                }, 2000);
+            }
+        }
+
+        // پروفایل
+        function toggleProfile() {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function copyReferral() {
+            const link = document.getElementById('ref-link');
+            navigator.clipboard.writeText(link.value);
+            alert('لینک دعوت شما کپی شد! با ارسال آن به دوستان، امتیاز بگیرید.');
+        }
+
+        function downloadImage() {
+            // شبیه‌سازی دانلود تصویر
+            const text = document.getElementById('horoscope-text').textContent;
+            alert(`✅ تصویر فال با لوگوی "فال و راز" ساخته شد!\nمتن فال: ${text.substring(0, 50)}...`);
+        }
+
+        // ---------------------------------------------
+        // 7. ستاره‌های سه‌بعدی (Three.js)
+        // ---------------------------------------------
+        function initStars() {
+            const container = document.getElementById('star-container');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            for (let i = 0; i < 3000; i++) {
+                vertices.push((Math.random() - 0.5) * 2000);
+                vertices.push((Math.random() - 0.5) * 2000);
+                vertices.push((Math.random() - 0.5) * 2000);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.8 });
+            const particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            camera.position.z = 1000;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                particles.rotation.y += 0.0003;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // ---------------------------------------------
+        // 8. شروع برنامه
+        // ---------------------------------------------
+        window.onload = function() {
+            initStars();
+            initUI();
+            // تنظیم رویداد تغییر تاریخ در اینپوت
+            document.getElementById('date-input').addEventListener('change', function(e) {
+                selectedDate = e.target.value;
+                renderHoroscope();
+                updateUI();
+            });
+        };
+    </script>
+</body>
+</html>
